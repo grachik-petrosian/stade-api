@@ -74,7 +74,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.post('/api/prompt', async (req, res) => {
+  console.log('📥 BODY:', JSON.stringify(req.body, null, 2));
+  req.url = '/ai-request';
+  return aiHandler(req, res);
+});
+
 app.post('/ai-request', async (req, res) => {
+  return aiHandler(req, res);
+});
+
+async function aiHandler(req, res) {
   try {
     const { prompt, imageBase64 } = req.body;
 
@@ -123,7 +133,7 @@ app.post('/ai-request', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Stade API running on port ${PORT}`));
