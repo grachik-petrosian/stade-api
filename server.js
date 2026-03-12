@@ -13,6 +13,10 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+const GEMINI_MODEL     = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const GEMINI_BASE      = 'https://generativelanguage.googleapis.com/v1beta/models';
+const FETCH_TIMEOUT_MS = 30_000;
+
 // ─── Part 1: Universal coaching science — never changes between users or requests ─
 // Part 2: User-specific context is built fresh in GeminiService.swift (AIContextBundle)
 // and sent as the prompt body on every request.
@@ -58,124 +62,107 @@ CONFLICT RESOLUTION:
 - Multiple negative signals stacking → be honest, adjust aggressively
 - Competition within 48hrs of eastward travel → flag as high risk, conservative plan
 
-OUTPUT FORMAT — always use this exact structure:
-- READINESS SCORE: X/10 — one line explanation
-- WORKOUT: type, duration, exercises with sets/reps, intensity note
-- NUTRITION: calorie target, protein target, meal timing, upcoming meal suggestions
-  (never repeat food already logged — only suggest what to eat next)
-- RECOVERY ACTIONS: 1-3 specific actions for today
-- TOMORROW PREVIEW: one line
+USER CONSTRAINTS ENFORCEMENT:
+If the prompt contains a MASTER CONSTRAINTS block, apply these rules without exception:
+- ALLERGENS: Any item listed under allergens is an absolute hard block. Never suggest it
+  in any form — food, ingredient, supplement, pre-workout product, or recovery item.
+  This overrides all coaching recommendations, menu items, and performance logic.
+- DIETARY RESTRICTIONS: Every suggestion in the entire response — meals, snacks,
+  supplements, workout nutrition, recovery foods — must fully comply with listed
+  restrictions. No partial compliance.
+- DISLIKES: Treat as a soft avoid across all food and meal suggestions.
+- TRAINING CONSTRAINTS: Respect in all workout and exercise suggestions.
+The values in MASTER CONSTRAINTS are user-specific and change per request.
+The enforcement principle above is universal and applies to every user.
 
-Tone: Analytical, science-grounded, direct. Like a coach who knows
-your data and tells you the exact action — not generic wellness advice.
+RESPONSE STYLE:
+- Tone: Analytical, science-grounded, direct. Like a coach who knows
+  the user's data and prescribes exact actions — not generic wellness advice.
+- Output format is specified per-request by the client prompt (JSON schemas).
+  Always follow the exact JSON structure requested. No markdown fences.
 `.trim();
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.post('/api/prompt', async (req, res) => {
-  console.log('📥 BODY:', JSON.stringify(req.body, null, 2));
-  req.url = '/ai-request';
-  return aiHandler(req, res);
-});
-
-app.post('/ai-request', async (req, res) => {
-  return aiHandler(req, res);
-});
+app.post('/api/prompt', (req, res) => aiHandler(req, res));
+app.post('/ai-request', (req, res) => aiHandler(req, res));
 
 async function aiHandler(req, res) {
   const t0 = Date.now();
   try {
     const { prompt, imageBase64 } = req.body;
 
-    // ── 1. Validate incoming request ──────────────────────────────────────────
+    // ── 1. Validate ───────────────────────────────────────────────────────────
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━ REQUEST ━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📥 Route:', req.originalUrl || req.url);
-    console.log('📥 Prompt length:', prompt ? prompt.length : 0, 'chars');
-    console.log('📥 Has image:', !!imageBase64);
-    if (prompt) {
-      console.log('📥 FULL PROMPT:');
-      console.log(prompt);
-    }
+    console.log('📥 Prompt:', prompt ? `${prompt.length} chars` : 'MISSING');
+    console.log('📥 Image:', imageBase64 ? `${imageBase64.length} chars` : 'none');
 
-    if (!prompt) {
-      console.log('🔴 Missing prompt — returning 400');
-      return res.status(400).json({ error: 'prompt is required' });
-    }
+    if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.log('🔴 GEMINI_API_KEY not set — returning 500');
-      return res.status(500).json({ error: 'API key not configured' });
-    }
+    if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
     // ── 2. Build Gemini payload ───────────────────────────────────────────────
     const parts = [{ text: prompt }];
     if (imageBase64) {
-      parts.push({
-        inline_data: { mime_type: 'image/jpeg', data: imageBase64 }
-      });
+      parts.push({ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } });
     }
 
-    const geminiPayload = {
+    const geminiBody = JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ parts }]
-    };
-    const geminiBody = JSON.stringify(geminiPayload);
+    });
 
-    console.log('📤 SYSTEM_PROMPT length:', SYSTEM_PROMPT.length, 'chars');
-    console.log('📤 Gemini payload size:', geminiBody.length, 'bytes');
-    console.log('📤 systemInstruction present:', !!geminiPayload.systemInstruction);
-    console.log('📤 contents[0].parts count:', parts.length);
+    const geminiURL = `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+    console.log('📤 Model:', GEMINI_MODEL, '| Payload:', geminiBody.length, 'bytes | Parts:', parts.length);
 
-    // ── 3. Call Gemini ────────────────────────────────────────────────────────
-    const geminiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey.substring(0, 6)}…`;
-    console.log('📤 Calling:', geminiURL);
+    // ── 3. Call Gemini (with timeout) ─────────────────────────────────────────
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: geminiBody
-      }
-    );
+    const response = await fetch(geminiURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: geminiBody,
+      signal: controller.signal
+    });
+    clearTimeout(timer);
 
     const data = await response.json();
     const elapsed = Date.now() - t0;
 
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━ RESPONSE ━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📩 Gemini HTTP status:', response.status);
-    console.log('📩 Elapsed:', elapsed, 'ms');
-
     // ── 4. Handle Gemini errors ───────────────────────────────────────────────
     if (!response.ok) {
-      console.log('🔴 Gemini error body:', JSON.stringify(data, null, 2));
+      console.log('🔴 Gemini', response.status, 'in', elapsed, 'ms:', JSON.stringify(data));
       return res.status(response.status).json({ error: data });
     }
 
     // ── 5. Extract and return text ────────────────────────────────────────────
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const finishReason = data.candidates?.[0]?.finishReason ?? 'unknown';
-    const candidateCount = data.candidates?.length ?? 0;
-    const tokenUsage = data.usageMetadata ?? {};
+    const usage = data.usageMetadata ?? {};
 
-    console.log('📩 Candidates:', candidateCount);
-    console.log('📩 Finish reason:', finishReason);
-    console.log('📩 Token usage:', JSON.stringify(tokenUsage));
-    console.log('📩 Response text length:', text.length, 'chars');
-    console.log('📩 FULL RESPONSE TEXT:');
-    console.log(text);
+    console.log(
+      '📩', response.status, '|', elapsed, 'ms |',
+      data.candidates?.[0]?.finishReason ?? '?', '|',
+      text.length, 'chars |',
+      'tokens:', JSON.stringify(usage)
+    );
+
     if (text.length === 0) {
-      console.log('⚠️  Empty response text — full candidates:', JSON.stringify(data.candidates, null, 2));
+      console.log('⚠️ Empty response — candidates:', JSON.stringify(data.candidates, null, 2));
     }
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     res.json({ text });
 
   } catch (err) {
-    console.error('🔴 aiHandler exception:', err);
+    if (err.name === 'AbortError') {
+      console.error('🔴 Gemini request timed out after', FETCH_TIMEOUT_MS, 'ms');
+      return res.status(504).json({ error: 'Gemini request timed out' });
+    }
+    console.error('🔴 aiHandler:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
