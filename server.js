@@ -95,8 +95,8 @@ async function aiHandler(req, res) {
     console.log('📥 Prompt length:', prompt ? prompt.length : 0, 'chars');
     console.log('📥 Has image:', !!imageBase64);
     if (prompt) {
-      console.log('📥 Prompt preview (first 500 chars):', prompt.substring(0, 500));
-      console.log('📥 Prompt tail  (last  300 chars):', prompt.substring(Math.max(0, prompt.length - 300)));
+      console.log('📥 FULL PROMPT:');
+      console.log(prompt);
     }
 
     if (!prompt) {
