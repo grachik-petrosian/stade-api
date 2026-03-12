@@ -85,52 +85,96 @@ app.post('/ai-request', async (req, res) => {
 });
 
 async function aiHandler(req, res) {
+  const t0 = Date.now();
   try {
     const { prompt, imageBase64 } = req.body;
 
+    // ── 1. Validate incoming request ──────────────────────────────────────────
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━ REQUEST ━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📥 Route:', req.originalUrl || req.url);
+    console.log('📥 Prompt length:', prompt ? prompt.length : 0, 'chars');
+    console.log('📥 Has image:', !!imageBase64);
+    if (prompt) {
+      console.log('📥 Prompt preview (first 500 chars):', prompt.substring(0, 500));
+      console.log('📥 Prompt tail  (last  300 chars):', prompt.substring(Math.max(0, prompt.length - 300)));
+    }
+
     if (!prompt) {
+      console.log('🔴 Missing prompt — returning 400');
       return res.status(400).json({ error: 'prompt is required' });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      console.log('🔴 GEMINI_API_KEY not set — returning 500');
       return res.status(500).json({ error: 'API key not configured' });
     }
 
+    // ── 2. Build Gemini payload ───────────────────────────────────────────────
     const parts = [{ text: prompt }];
-
     if (imageBase64) {
       parts.push({
-        inline_data: {
-          mime_type: 'image/jpeg',
-          data: imageBase64
-        }
+        inline_data: { mime_type: 'image/jpeg', data: imageBase64 }
       });
     }
+
+    const geminiPayload = {
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ parts }]
+    };
+    const geminiBody = JSON.stringify(geminiPayload);
+
+    console.log('📤 SYSTEM_PROMPT length:', SYSTEM_PROMPT.length, 'chars');
+    console.log('📤 Gemini payload size:', geminiBody.length, 'bytes');
+    console.log('📤 systemInstruction present:', !!geminiPayload.systemInstruction);
+    console.log('📤 contents[0].parts count:', parts.length);
+
+    // ── 3. Call Gemini ────────────────────────────────────────────────────────
+    const geminiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey.substring(0, 6)}…`;
+    console.log('📤 Calling:', geminiURL);
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts }]
-        })
+        body: geminiBody
       }
     );
 
     const data = await response.json();
+    const elapsed = Date.now() - t0;
 
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━ RESPONSE ━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📩 Gemini HTTP status:', response.status);
+    console.log('📩 Elapsed:', elapsed, 'ms');
+
+    // ── 4. Handle Gemini errors ───────────────────────────────────────────────
     if (!response.ok) {
+      console.log('🔴 Gemini error body:', JSON.stringify(data, null, 2));
       return res.status(response.status).json({ error: data });
     }
 
+    // ── 5. Extract and return text ────────────────────────────────────────────
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const finishReason = data.candidates?.[0]?.finishReason ?? 'unknown';
+    const candidateCount = data.candidates?.length ?? 0;
+    const tokenUsage = data.usageMetadata ?? {};
+
+    console.log('📩 Candidates:', candidateCount);
+    console.log('📩 Finish reason:', finishReason);
+    console.log('📩 Token usage:', JSON.stringify(tokenUsage));
+    console.log('📩 Response text length:', text.length, 'chars');
+    console.log('📩 Response preview (first 300 chars):', text.substring(0, 300));
+    if (text.length === 0) {
+      console.log('⚠️  Empty response text — full candidates:', JSON.stringify(data.candidates, null, 2));
+    }
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     res.json({ text });
 
   } catch (err) {
-    console.error(err);
+    console.error('🔴 aiHandler exception:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
