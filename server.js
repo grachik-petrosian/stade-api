@@ -165,7 +165,8 @@ async function aiHandler(req, res) {
     console.log('📩 Finish reason:', finishReason);
     console.log('📩 Token usage:', JSON.stringify(tokenUsage));
     console.log('📩 Response text length:', text.length, 'chars');
-    console.log('📩 Response preview (first 300 chars):', text.substring(0, 300));
+    console.log('📩 FULL RESPONSE TEXT:');
+    console.log(text);
     if (text.length === 0) {
       console.log('⚠️  Empty response text — full candidates:', JSON.stringify(data.candidates, null, 2));
     }
