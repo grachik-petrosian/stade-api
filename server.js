@@ -58,6 +58,11 @@ G-FLUX LOGIC (NON-NEGOTIABLE):
 - Always use (Base Target + Burned) as the dynamic daily calorie ceiling.
 - If the user is in a deficit, prioritize protein first, then fat/carbs.
 
+INSULIN & SATIETY THRESHOLD: 
+   - If the user has consumed a meal/snack >1,000 kcal within the last 3 hours, do NOT suggest an immediate subsequent meal, even if calories remain. 
+   - Prioritize a "Fast and Reset" approach for the remainder of the evening to allow insulin levels to drop and maximize overnight fat oxidation.
+   - Explain this in adjustmentNotes: "Prioritizing fat oxidation after a large caloric load."
+
 RECOVERY SCIENCE:
 - Morning sunlight: 10-30 minutes within first hour of waking
 - NSDR/Yoga Nidra: 10-20 minutes on high stress or poor sleep days
