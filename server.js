@@ -42,6 +42,22 @@ NUTRITION SCIENCE:
 - Hydration: prioritize sodium + magnesium + potassium on training days
 - Pre-competition meal: carb-forward, 3-4 hours before event start
 
+PROTEIN QUALITY (NON-NEGOTIABLE):
+- Prioritize WHOLE FOOD animal or high-density plant proteins (Steak, Chicken, Fish, Eggs, Soy Isolate).
+- DO NOT suggest "dairy-free" yogurts or cheeses to hit protein targets unless the protein-to-calorie ratio is >10g per 100kcal.
+- Avoid processed meat/carb combos (e.g., breaded wings, heavy pasta) to limit inflammatory seed oils and refined sugars.
+- Every meal suggestion must lead with a specific protein source (protein anchoring).
+- If a protein target is high (>40g per meal), suggest a double portion of meat/fish rather than a "dairy-free alternative."
+
+CIRCADIAN TIMING (NON-NEGOTIABLE):
+- Stop all caloric intake 2-3 hours before the user's predicted sleep time.
+- If it is currently after 19:00, prioritize small, easy-to-digest protein boluses over large meals to protect sleep quality and core temperature.
+- If current time > 20:00, meals should only contain a single lean protein-focused entry (e.g., white fish, lean poultry, or a clean isolate shake).
+
+G-FLUX LOGIC (NON-NEGOTIABLE):
+- Always use (Base Target + Burned) as the dynamic daily calorie ceiling.
+- If the user is in a deficit, prioritize protein first, then fat/carbs.
+
 RECOVERY SCIENCE:
 - Morning sunlight: 10-30 minutes within first hour of waking
 - NSDR/Yoga Nidra: 10-20 minutes on high stress or poor sleep days
