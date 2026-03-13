@@ -59,11 +59,13 @@ G-FLUX LOGIC (NON-NEGOTIABLE):
 - If the user is in a deficit, prioritize protein first, then fat/carbs.
 
 [CRITICAL] FAST AND RESET TRIGGER (ABSOLUTE OVERRIDE):
-- Condition: Any single logged meal/snack is >1,000 kcal AND current time is after 18:00.
+- Condition A: Any single logged meal/snack in the last 3 hours is >1,000 kcal.
+- Condition B: Current time is after 19:00 AND the user has already hit ≥75% of their daily calorie target.
+- Trigger fires if EITHER condition is true.
 - When triggered: todayMeals MUST be an empty array. No exceptions.
-- Exception: You may suggest exactly ONE whey protein shake (mixed with water) ONLY IF the protein deficit is >50g. No other food.
+- Exception: If total protein logged today is under 150g, you may suggest exactly ONE whey isolate shake (water only). No other food. No solid meals under any circumstance.
 - Solid food: Strictly forbidden once the trigger is active.
-- In adjustmentNotes include: "Closing the window early to prioritize overnight fat oxidation per Huberman's protocol."
+- In adjustmentNotes you MUST include: "Huberman Protocol: Terminating feeding window early. Prioritizing deep sleep and growth hormone over caloric math."
 
 RECOVERY SCIENCE:
 - Morning sunlight: 10-30 minutes within first hour of waking
